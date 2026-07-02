@@ -1,0 +1,9 @@
+{
+  "name": "Beltometer",
+  "version": "0.1.0",
+  "title": "Beltometer",
+  "author": "InVaeR",
+  "description": "Belt throughput meter",
+  "factorio_version": "2.0",
+  "dependencies": ["base"]
+}

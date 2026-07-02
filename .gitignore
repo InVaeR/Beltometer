@@ -1,0 +1,21 @@
+# Factorio mod portal release archive
+*.zip
+
+# OS files
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE / editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.suo
+*.user
+*.sln
+
+# Lua temp / logs
+*.log
+AGENTS.md
