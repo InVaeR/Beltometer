@@ -2,10 +2,13 @@ local Averaging = {}
 
 function Averaging.SMA(history, window_size, item_name)
   local sum = 0
+  local count = 0
   for tick, deltas in pairs(history) do
     sum = sum + (deltas[item_name] or 0)
+    count = count + 1
   end
-  return sum / window_size
+  if count == 0 then return 0 end
+  return sum / count
 end
 
 function Averaging.EMA(history, window_size, item_name, alpha)

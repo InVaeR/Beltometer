@@ -19,91 +19,102 @@ local function format_rate(value, unit)
 end
 
 function beltometer.create(entity)
+  local window_size = 60
+  if settings and settings.global and settings.global["beltometer-default-window-size"] then
+    window_size = settings.global["beltometer-default-window-size"].value
+  end
+
+  local unit_number = entity.unit_number
   local data = {
     entity = entity,
-    prev_signals = {},
+    unit_number = unit_number,
     history = {},
-    render_ids = {},
+    render_objects = {},
     settings = {
       time_unit = "sec",
-      window_size = 60,
+      window_size = window_size,
       avg_mode = "SMA",
       display_mode = "total",
       ema_alpha = 0.3,
     },
   }
-  global.beltometers[entity.unit_number] = data
-  global.beltometer_ids[#global.beltometer_ids + 1] = entity.unit_number
+  storage.beltometers[unit_number] = data
+  storage.beltometer_ids[#storage.beltometer_ids + 1] = unit_number
 end
 
-function beltometer.destroy(entity)
-  local data = global.beltometers[entity.unit_number]
+function beltometer.destroy(unit_number)
+  local data = storage.beltometers[unit_number]
   if data then
     beltometer.clear_display(data)
-    global.beltometers[entity.unit_number] = nil
+    storage.beltometers[unit_number] = nil
   end
 end
 
 function beltometer.clear_display(data)
-  for _, id in ipairs(data.render_ids) do
-    if rendering.is_valid(id) then
-      rendering.destroy(id)
+  for _, obj in ipairs(data.render_objects) do
+    if obj.valid then
+      obj.destroy()
     end
   end
-  data.render_ids = {}
+  data.render_objects = {}
 end
 
-function beltometer.update(data, tick)
-  local entity = data.entity
-  local settings = data.settings
-
-  if not entity.valid then
-    beltometer.destroy(entity)
-    return
-  end
-
-  local network = entity.get_circuit_network(defines.wire_connector_id.circuit_red)
-  if not network then
-    beltometer.clear_display(data)
-    return
-  end
-
+local function read_wire_signals(entity, wire_id)
+  local network = entity.get_circuit_network(wire_id)
+  if not network then return {} end
   local signals = network.signals
-  if not signals or #signals == 0 then
-    beltometer.clear_display(data)
-    return
-  end
+  if not signals then return {} end
 
-  local current = {}
+  local result = {}
   for _, signal in ipairs(signals) do
-    if signal.signal.type == "item" then
-      current[signal.signal.name] = signal.count
+    if signal.signal then
+      local stype = signal.signal.type
+      local sname = signal.signal.name
+      if (stype == nil or stype == "item") and prototypes.item[sname] then
+        result[sname] = (result[sname] or 0) + signal.count
+      end
     end
   end
+  return result
+end
 
-  local deltas = {}
-  for name, count in pairs(current) do
-    local prev = data.prev_signals[name] or 0
-    local delta = count - prev
-    if delta > 0 then
-      deltas[name] = delta
-    end
-  end
+local function merge_signals(a, b)
+  if not next(a) then return b end
+  if not next(b) then return a end
+  local merged = {}
+  for name, count in pairs(a) do merged[name] = count end
+  for name, count in pairs(b) do merged[name] = (merged[name] or 0) + count end
+  return merged
+end
 
-  data.history[tick] = deltas
+--- Lightweight: read pulse signals from both wires and store in history.
+--- Runs every tick for every beltometer.
+function beltometer.collect(data, tick)
+  local entity = data.entity
+  if not entity.valid then return end
 
-  local cutoff = tick - settings.window_size
+  local red = read_wire_signals(entity, defines.wire_connector_id.circuit_red)
+  local green = read_wire_signals(entity, defines.wire_connector_id.circuit_green)
+
+  data.history[tick] = merge_signals(red, green)
+
+  local cutoff = tick - data.settings.window_size
   for t in pairs(data.history) do
-    if t < cutoff then
+    if t <= cutoff then
       data.history[t] = nil
     end
   end
+end
 
-  data.prev_signals = current
+--- Expensive: calculate throughput and update rendering.
+--- Runs batched (not every tick for every beltometer).
+function beltometer.update_display(data)
+  local settings = data.settings
+  local window_size = settings.window_size
 
   local all_items = {}
-  for _, deltas in pairs(data.history) do
-    for name in pairs(deltas) do
+  for _, signals in pairs(data.history) do
+    for name in pairs(signals) do
       all_items[name] = true
     end
   end
@@ -116,11 +127,11 @@ function beltometer.update(data, tick)
   local rates = {}
   if settings.avg_mode == "SMA" then
     for name in pairs(all_items) do
-      rates[name] = averaging.SMA(data.history, settings.window_size, name)
+      rates[name] = averaging.SMA(data.history, window_size, name)
     end
   else
     for name in pairs(all_items) do
-      rates[name] = averaging.EMA(data.history, settings.window_size, name, settings.ema_alpha)
+      rates[name] = averaging.EMA(data.history, window_size, name, settings.ema_alpha)
     end
   end
 
@@ -129,57 +140,56 @@ function beltometer.update(data, tick)
     converted[name] = convert_rate(rate, settings.time_unit)
   end
 
-  beltometer.update_display(data, converted)
+  beltometer.render_display(data, converted)
 end
 
-function beltometer.update_display(data, rates)
+function beltometer.render_display(data, rates)
   beltometer.clear_display(data)
 
   local entity = data.entity
   local surface = entity.surface
   local settings = data.settings
-  local render_ids = {}
-  local color = {r = 0.2, g = 1, b = 0.2}
+  local render_objects = {}
 
   if settings.display_mode == "total" then
     local total = 0
     for _, rate in pairs(rates) do
       total = total + rate
     end
-    local text = format_rate(total, settings.time_unit)
-    local id = rendering.draw_text({
-      text = text,
+    if total == 0 then return end
+
+    local obj = rendering.draw_text({
+      text = format_rate(total, settings.time_unit),
       surface = surface,
       target = entity,
       target_offset = {0, -1.5},
-      color = color,
+      color = {r = 0.2, g = 1, b = 0.2},
       scale = 0.8,
       font = "default-bold",
       alignment = "center",
       only_in_alt_mode = false,
     })
-    render_ids[#render_ids + 1] = id
+    render_objects[#render_objects + 1] = obj
   else
     local y_offset = -1.5
     for name, rate in pairs(rates) do
-      local text = format_rate(rate, settings.time_unit)
-      local id = rendering.draw_text({
-        text = text,
+      local obj = rendering.draw_text({
+        text = format_rate(rate, settings.time_unit),
         surface = surface,
         target = entity,
         target_offset = {0, y_offset},
-        color = color,
+        color = {r = 0.2, g = 1, b = 0.2},
         scale = 0.7,
         font = "default-bold",
         alignment = "center",
         only_in_alt_mode = false,
       })
-      render_ids[#render_ids + 1] = id
+      render_objects[#render_objects + 1] = obj
       y_offset = y_offset - 0.35
     end
   end
 
-  data.render_ids = render_ids
+  data.render_objects = render_objects
 end
 
 return beltometer
