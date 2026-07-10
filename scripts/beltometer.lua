@@ -8,12 +8,30 @@ local beltometer = {}
 local PANEL_ALWAYS = {
   first_signal = {type = "virtual", name = "signal-everything"},
   comparator = "≥",
-  constant = -2147483648,
+  constant = 0,
 }
 
-local function set_panel_text(entity, text, icon)
+local MAX_LINES = 5
+
+local function set_panel_messages(data, lines)
+  local entity = data.entity
+  if not entity.valid then return end
   local cb = entity.get_or_create_control_behavior()
-  cb.set_message(1, {text = text, icon = icon, condition = PANEL_ALWAYS})
+  local count = math.min(#lines, MAX_LINES)
+  local messages = {}
+
+  for i = 1, count do
+    local line = lines[i]
+    messages[i] = {
+      text = line.text,
+      icon = line.icon,
+      condition = PANEL_ALWAYS,
+    }
+  end
+
+  cb.messages = messages
+  entity.display_panel_always_show = true
+  entity.display_panel_show_in_chart = false
 end
 
 local function convert_rate(items_per_sec, unit)
@@ -39,7 +57,6 @@ function beltometer.create(entity)
     unit_number = unit_number,
     history = {},
     accumulator = {},
-    render_objects = {},
     phase = unit_number % SAMPLE_TICKS,
     settings = {
       time_unit = "sec",
@@ -63,7 +80,7 @@ end
 
 function beltometer.clear_display(data)
   if data.entity.valid then
-    set_panel_text(data.entity, "")
+    set_panel_messages(data, {})
   end
 end
 
@@ -113,7 +130,7 @@ function beltometer.update_display(data)
   if not entity.valid then return end
 
   if #history < window_size then
-    set_panel_text(entity, "...")
+    set_panel_messages(data, {{text = "..."}})
     return
   end
 
@@ -145,8 +162,6 @@ function beltometer.update_display(data)
 end
 
 function beltometer.render_display(data, rates)
-  beltometer.clear_display(data)
-
   local entity = data.entity
   local settings = data.settings
 
@@ -159,28 +174,34 @@ function beltometer.render_display(data, rates)
   table.sort(names)
 
   if #names == 0 then
+    set_panel_messages(data, {})
     return
   end
 
-  if settings.display_mode == "total" then
-    local total = 0
-    local icons = {}
-    for _, name in ipairs(names) do
-      total = total + rates[name]
-      icons[#icons + 1] = string.format("[item=%s]", name)
-    end
-    set_panel_text(
-      entity,
-      table.concat(icons) .. " " .. format_rate(total, settings.time_unit),
-      {type = "item", name = names[1]}
-    )
-  else
-    local parts = {}
-    for _, name in ipairs(names) do
-      parts[#parts + 1] = string.format("[item=%s]%s", name, format_rate(rates[name], settings.time_unit))
-    end
-    set_panel_text(entity, table.concat(parts, " "), {type = "item", name = names[1]})
+  local total = 0
+  local icons = {}
+  for _, name in ipairs(names) do
+    total = total + rates[name]
+    icons[#icons + 1] = string.format("[item=%s]", name)
   end
+
+  local lines = {
+    {
+      text = table.concat(icons) .. " " .. format_rate(total, settings.time_unit),
+      icon = {type = "item", name = names[1]},
+    },
+  }
+
+  if settings.display_mode == "per_item" then
+    for _, name in ipairs(names) do
+      lines[#lines + 1] = {
+        text = string.format("[item=%s]%s", name, format_rate(rates[name], settings.time_unit)),
+        icon = {type = "item", name = name},
+      }
+    end
+  end
+
+  set_panel_messages(data, lines)
 end
 
 return beltometer
