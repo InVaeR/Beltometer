@@ -3,9 +3,9 @@ data:extend({
     type = "int-setting",
     name = "beltometer-default-window-size",
     setting_type = "runtime-global",
-    default_value = 60,
+    default_value = 10,
     minimum_value = 1,
-    maximum_value = 6000,
+    maximum_value = 60,
     order = "a",
   },
   {

@@ -55,7 +55,7 @@ local function build_settings_frame(player, entity, data)
     type = "slider",
     name = "beltometer-window-size",
     minimum_value = 1,
-    maximum_value = 600,
+    maximum_value = 60,
     value = data.settings.window_size,
     discrete_slider = true,
     value_step = 1,
@@ -66,7 +66,6 @@ local function build_settings_frame(player, entity, data)
     caption = {
       "gui.beltometer-window-label",
       data.settings.window_size,
-      string.format("%.1f", data.settings.window_size / 60),
     },
   }
 
@@ -146,7 +145,6 @@ function gui.on_value_changed(event)
       label.caption = {
         "gui.beltometer-window-label",
         element.slider_value,
-        string.format("%.1f", element.slider_value / 60),
       }
     end
     update_display_for_frame(frame)

@@ -9,9 +9,21 @@ end)
 script.on_configuration_changed(function()
   storage.beltometers = storage.beltometers or {}
   storage.beltometer_ids = storage.beltometer_ids or {}
+  for _, data in pairs(storage.beltometers) do
+    if not data.phase then
+      data.phase = data.unit_number % 60
+      data.history = {}
+      data.accumulator = {}
+      local ws = data.settings.window_size or 10
+      if ws > 60 then ws = math.floor(ws / 60) end
+      data.settings.window_size = math.max(1, math.min(60, ws))
+      for _, obj in pairs(data.render_objects or {}) do
+        if obj.valid then obj.destroy() end
+      end
+      data.render_objects = {}
+    end
+  end
 end)
-
-local BATCH_SIZE = 5
 
 script.on_event(defines.events.on_tick, function(event)
   local tick = event.tick
@@ -31,17 +43,6 @@ script.on_event(defines.events.on_tick, function(event)
       ids[i] = ids[n]
       ids[n] = nil
       n = n - 1
-    end
-  end
-
-  if n == 0 then return end
-
-  local num_batches = math.ceil(n / BATCH_SIZE)
-  local offset = tick % num_batches
-  for j = offset + 1, n, num_batches do
-    local data = storage.beltometers[ids[j]]
-    if data and data.entity.valid then
-      beltometer.update_display(data)
     end
   end
 end)
