@@ -2,7 +2,7 @@ data:extend({
   {
     type = "technology",
     name = "beltometer",
-    icon = "__base__/graphics/icons/constant-combinator.png",
+    icon = "__base__/graphics/icons/display-panel.png",
     icon_size = 64,
     prerequisites = {"circuit-network"},
     effects = {

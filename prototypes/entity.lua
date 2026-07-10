@@ -1,17 +1,40 @@
-local beltometer = table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])
+local rtint = {r = 0.7, g = 0.85, b = 1.0}
 
-beltometer.name = "beltometer"
-beltometer.minable = {mining_time = 0.2, result = "beltometer"}
-beltometer.icon = "__base__/graphics/icons/constant-combinator.png"
-beltometer.icon_size = 64
+local vanilla = data.raw["display-panel"]["display-panel"]
+local entity = table.deepcopy(vanilla)
 
-if beltometer.sprites and beltometer.sprites.sheets then
-  for _, sheet in ipairs(beltometer.sprites.sheets) do
-    sheet.tint = {r = 0.7, g = 0.85, b = 1.0}
-    if sheet.hr_version then
-      sheet.hr_version.tint = {r = 0.7, g = 0.85, b = 1.0}
+entity.name = "beltometer"
+entity.minable = {mining_time = 0.2, result = "beltometer"}
+entity.icons = {{icon = "__base__/graphics/icons/display-panel.png", tint = rtint}}
+entity.icon = nil
+
+local function tint_sprite(sprite)
+  if not sprite then return end
+  if sprite.layers then
+    for _, layer in ipairs(sprite.layers) do
+      if not layer.draw_as_shadow then
+        layer.tint = rtint
+      end
     end
+  elseif sprite.sheet then
+    if not sprite.sheet.draw_as_shadow then
+      sprite.sheet.tint = rtint
+    end
+  elseif not sprite.draw_as_shadow then
+    sprite.tint = rtint
   end
 end
 
-data:extend({beltometer})
+local sprites = entity.sprites
+if sprites then
+  if sprites.north or sprites.east or sprites.south or sprites.west then
+    tint_sprite(sprites.north)
+    tint_sprite(sprites.east)
+    tint_sprite(sprites.south)
+    tint_sprite(sprites.west)
+  else
+    tint_sprite(sprites)
+  end
+end
+
+data:extend({entity})

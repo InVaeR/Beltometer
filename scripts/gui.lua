@@ -2,13 +2,6 @@ local beltometer = require("scripts.beltometer")
 
 local gui = {}
 
-local function get_player(event)
-  if event.player_index then
-    return game.get_player(event.player_index)
-  end
-  return nil
-end
-
 local function find_frame(element)
   while element do
     if element.name == "beltometer_frame" then
@@ -110,19 +103,21 @@ local function build_settings_frame(player, entity, data)
   }
 
   frame.force_auto_center()
+  return frame
 end
 
 function gui.on_opened(event)
   local entity = event.entity
   if not entity or entity.name ~= "beltometer" then return end
 
-  local player = get_player(event)
+  local player = game.get_player(event.player_index)
   if not player then return end
 
   local data = storage.beltometers[entity.unit_number]
   if not data then return end
 
-  build_settings_frame(player, entity, data)
+  local frame = build_settings_frame(player, entity, data)
+  player.opened = frame
 end
 
 function gui.on_closed(event)

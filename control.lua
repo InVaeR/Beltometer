@@ -6,11 +6,9 @@ script.on_init(function()
   storage.beltometer_ids = {}
 end)
 
-script.on_load(function() end)
-
 script.on_configuration_changed(function()
-  if not storage.beltometers then storage.beltometers = {} end
-  if not storage.beltometer_ids then storage.beltometer_ids = {} end
+  storage.beltometers = storage.beltometers or {}
+  storage.beltometer_ids = storage.beltometer_ids or {}
 end)
 
 local BATCH_SIZE = 5
@@ -21,7 +19,6 @@ script.on_event(defines.events.on_tick, function(event)
   local n = #ids
   if n == 0 then return end
 
-  -- Collect data every tick + swap-remove invalid entities
   local i = 1
   while i <= n do
     local id = ids[i]
@@ -39,9 +36,9 @@ script.on_event(defines.events.on_tick, function(event)
 
   if n == 0 then return end
 
-  -- Display update batched (dense array, # is correct)
-  local offset = tick % math.ceil(n / BATCH_SIZE)
-  for j = offset + 1, n, BATCH_SIZE do
+  local num_batches = math.ceil(n / BATCH_SIZE)
+  local offset = tick % num_batches
+  for j = offset + 1, n, num_batches do
     local data = storage.beltometers[ids[j]]
     if data and data.entity.valid then
       beltometer.update_display(data)
@@ -51,23 +48,27 @@ end)
 
 local function on_built(event)
   local entity = event.entity
-  if entity and entity.name == "beltometer" then
+  if entity and entity.valid and entity.name == "beltometer" then
     beltometer.create(entity)
   end
 end
 
 local function on_mined(event)
   local entity = event.entity
-  if entity and entity.name == "beltometer" then
+  if entity and entity.valid and entity.name == "beltometer" then
     beltometer.destroy(entity.unit_number)
   end
 end
 
-script.on_event(defines.events.on_built_entity, on_built)
-script.on_event(defines.events.on_robot_built_entity, on_built)
-script.on_event(defines.events.on_player_mined_entity, on_mined)
-script.on_event(defines.events.on_robot_mined_entity, on_mined)
-script.on_event(defines.events.on_entity_died, on_mined)
+local filter = {{filter = "name", name = "beltometer"}}
+script.on_event(defines.events.on_built_entity, on_built, filter)
+script.on_event(defines.events.on_robot_built_entity, on_built, filter)
+script.on_event(defines.events.script_raised_built, on_built, filter)
+script.on_event(defines.events.script_raised_revive, on_built, filter)
+script.on_event(defines.events.on_player_mined_entity, on_mined, filter)
+script.on_event(defines.events.on_robot_mined_entity, on_mined, filter)
+script.on_event(defines.events.on_entity_died, on_mined, filter)
+script.on_event(defines.events.script_raised_destroy, on_mined, filter)
 
 script.on_event(defines.events.on_gui_opened, gui.on_opened)
 script.on_event(defines.events.on_gui_closed, gui.on_closed)

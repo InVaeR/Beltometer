@@ -59,44 +59,30 @@ function beltometer.clear_display(data)
   data.render_objects = {}
 end
 
-local function read_wire_signals(entity, wire_id)
-  local network = entity.get_circuit_network(wire_id)
-  if not network then return {} end
-  local signals = network.signals
-  if not signals then return {} end
-
+local function read_wire_signals(entity)
   local result = {}
-  for _, signal in ipairs(signals) do
-    if signal.signal then
-      local stype = signal.signal.type
-      local sname = signal.signal.name
-      if (stype == nil or stype == "item") and prototypes.item[sname] then
-        result[sname] = (result[sname] or 0) + signal.count
+  local function add_net(net)
+    if not net or not net.signals then return end
+    for _, sig in ipairs(net.signals) do
+      local s = sig.signal
+      if s and (s.type == nil or s.type == "item") and prototypes.item[s.name] then
+        result[s.name] = (result[s.name] or 0) + sig.count
       end
     end
   end
+
+  add_net(entity.get_circuit_network(defines.wire_connector_id.circuit_red))
+  add_net(entity.get_circuit_network(defines.wire_connector_id.circuit_green))
   return result
 end
 
-local function merge_signals(a, b)
-  if not next(a) then return b end
-  if not next(b) then return a end
-  local merged = {}
-  for name, count in pairs(a) do merged[name] = count end
-  for name, count in pairs(b) do merged[name] = (merged[name] or 0) + count end
-  return merged
-end
-
---- Lightweight: read pulse signals from both wires and store in history.
+--- Lightweight: read pulse signals from input circuit network and store in history.
 --- Runs every tick for every beltometer.
 function beltometer.collect(data, tick)
   local entity = data.entity
   if not entity.valid then return end
 
-  local red = read_wire_signals(entity, defines.wire_connector_id.circuit_red)
-  local green = read_wire_signals(entity, defines.wire_connector_id.circuit_green)
-
-  data.history[tick] = merge_signals(red, green)
+  data.history[tick] = read_wire_signals(entity)
 
   local cutoff = tick - data.settings.window_size
   for t in pairs(data.history) do
@@ -161,8 +147,7 @@ function beltometer.render_display(data, rates)
     local obj = rendering.draw_text({
       text = format_rate(total, settings.time_unit),
       surface = surface,
-      target = entity,
-      target_offset = {0, -1.5},
+      target = {entity = entity, offset = {0, -0.9}},
       color = {r = 0.2, g = 1, b = 0.2},
       scale = 0.8,
       font = "default-bold",
@@ -171,13 +156,12 @@ function beltometer.render_display(data, rates)
     })
     render_objects[#render_objects + 1] = obj
   else
-    local y_offset = -1.5
+    local y_offset = -0.9
     for name, rate in pairs(rates) do
       local obj = rendering.draw_text({
         text = format_rate(rate, settings.time_unit),
         surface = surface,
-        target = entity,
-        target_offset = {0, y_offset},
+        target = {entity = entity, offset = {0, y_offset}},
         color = {r = 0.2, g = 1, b = 0.2},
         scale = 0.7,
         font = "default-bold",

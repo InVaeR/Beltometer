@@ -8,7 +8,7 @@ function Averaging.SMA(history, window_size, item_name)
     count = count + 1
   end
   if count == 0 then return 0 end
-  return sum / count
+  return sum / window_size
 end
 
 function Averaging.EMA(history, window_size, item_name, alpha)
