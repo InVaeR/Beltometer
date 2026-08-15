@@ -40,9 +40,10 @@ local function convert_rate(items_per_sec, unit)
   return items_per_sec
 end
 
-local function format_rate(value, unit)
+local function format_rate(value, unit, partial)
   local suffix = {sec = "/s", min = "/m", hour = "/h"}
-  return string.format("%.1f%s", value, suffix[unit])
+  local prefix = partial and "~" or ""
+  return string.format("%s%.1f%s", prefix, value, suffix[unit])
 end
 
 function beltometer.create(entity)
@@ -129,14 +130,16 @@ function beltometer.update_display(data)
   local entity = data.entity
   if not entity.valid then return end
 
-  if #history < window_size then
+  if #history == 0 then
     set_panel_messages(data, {{text = "..."}})
     return
   end
 
+  local partial = #history < window_size
   local n = #history
+  local w = math.min(n, window_size)
   local all_items = {}
-  for i = n - window_size + 1, n do
+  for i = n - w + 1, n do
     for name in pairs(history[i]) do
       all_items[name] = true
     end
@@ -158,10 +161,10 @@ function beltometer.update_display(data)
     converted[name] = convert_rate(rate, settings.time_unit)
   end
 
-  beltometer.render_display(data, converted)
+  beltometer.render_display(data, converted, partial)
 end
 
-function beltometer.render_display(data, rates)
+function beltometer.render_display(data, rates, partial)
   local entity = data.entity
   local settings = data.settings
 
@@ -187,7 +190,7 @@ function beltometer.render_display(data, rates)
 
   local lines = {
     {
-      text = table.concat(icons) .. " " .. format_rate(total, settings.time_unit),
+      text = table.concat(icons) .. " " .. format_rate(total, settings.time_unit, partial),
       icon = {type = "item", name = names[1]},
     },
   }
@@ -195,7 +198,7 @@ function beltometer.render_display(data, rates)
   if settings.display_mode == "per_item" then
     for _, name in ipairs(names) do
       lines[#lines + 1] = {
-        text = string.format("[item=%s]%s", name, format_rate(rates[name], settings.time_unit)),
+        text = string.format("[item=%s]%s", name, format_rate(rates[name], settings.time_unit, partial)),
         icon = {type = "item", name = name},
       }
     end

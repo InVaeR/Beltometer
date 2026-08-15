@@ -73,6 +73,7 @@ script.on_event(defines.events.script_raised_destroy, on_mined, filter)
 
 script.on_event(defines.events.on_gui_opened, gui.on_opened)
 script.on_event(defines.events.on_gui_closed, gui.on_closed)
+script.on_event(defines.events.on_gui_click, gui.on_click)
 script.on_event(defines.events.on_gui_value_changed, gui.on_value_changed)
 script.on_event(defines.events.on_gui_selection_state_changed, gui.on_selection_changed)
 script.on_event(defines.events.on_gui_text_changed, gui.on_text_changed)

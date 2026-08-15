@@ -1,7 +1,6 @@
-local rtint = {r = 0.7, g = 0.85, b = 1.0}
+local rtint = {r = 0.5, g = 0.5, b = 1.0}
 
-local vanilla = data.raw["display-panel"]["display-panel"]
-local entity = table.deepcopy(vanilla)
+local entity = table.deepcopy(data.raw["display-panel"]["display-panel"])
 
 entity.name = "beltometer"
 entity.minable = {mining_time = 0.2, result = "beltometer"}

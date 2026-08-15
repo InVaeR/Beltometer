@@ -28,11 +28,34 @@ local function build_settings_frame(player, entity, data)
   local frame = player.gui.screen.add{
     type = "frame",
     name = "beltometer_frame",
-    caption = {"gui.beltometer-title"},
     direction = "vertical",
     auto_center = true,
   }
   frame.tags = {unit_number = entity.unit_number}
+
+  local titlebar = frame.add{type = "flow", direction = "horizontal"}
+  titlebar.drag_target = frame
+  titlebar.add{
+    type = "label",
+    caption = {"gui.beltometer-title"},
+    style = "frame_title",
+    ignored_by_interaction = true,
+  }
+  local filler = titlebar.add{
+    type = "empty-widget",
+    style = "draggable_space_header",
+    ignored_by_interaction = true,
+  }
+  filler.style.horizontally_stretchable = true
+  filler.style.height = 24
+  titlebar.add{
+    type = "sprite-button",
+    name = "beltometer_close",
+    style = "frame_action_button",
+    sprite = "utility/close",
+    hovered_sprite = "utility/close_black",
+    clicked_sprite = "utility/close_black",
+  }
 
   local tbl = frame.add{type = "table", column_count = 2}
 
@@ -125,6 +148,23 @@ function gui.on_closed(event)
 
   if element.name == "beltometer_frame" then
     element.destroy()
+  end
+end
+
+function gui.on_click(event)
+  local element = event.element
+  if not element or not element.valid then return end
+
+  if element.name == "beltometer_close" then
+    local frame = find_frame(element)
+    if frame then
+      local player = game.get_player(event.player_index)
+      if player and player.opened == frame then
+        player.opened = nil
+      else
+        frame.destroy()
+      end
+    end
   end
 end
 
